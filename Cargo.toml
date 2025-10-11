@@ -1,0 +1,25 @@
+[package]
+name = "bevy_tangled"
+version = "0.1.0"
+edition = "2024"
+description = "a steam/direct ip p2p networking crate with bevy support"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/bgkillas/bevy_tangled"
+
+[features]
+default=["steam", "tangled", "bevy", "compress"]
+steam=["dep:steamworks"]
+tangled=["dep:tangled"]
+bevy=["dep:bevy_app", "dep:bevy_ecs"]
+compress=["dep:lz4_flex"]
+log=["dep:log", "tangled/log"]
+
+[dependencies]
+steamworks = {git="https://github.com/bgkillas/steamworks-rs", optional = true}
+tangled = {git="https://github.com/intquant/tangled", optional = true, default-features = false}
+bevy_app = { version = "0.17.2", default-features = false, optional = true }
+bevy_ecs = { version = "0.17.2", default-features = false, optional = true }
+lz4_flex = {version="0.11.5", default-features = false, optional = true}
+bitcode = {git="https://github.com/SoftbearStudios/bitcode.git", version="0.6.7", branch = "large_c_style_enums"}
+tokio = "1.47.1"
+log = {version="0.4.28", optional = true}
