@@ -39,7 +39,7 @@ impl IpClient {
             connected: false,
         })
     }
-    pub(crate) fn recv<T, F>(&mut self, mut f: F, compression: Compression)
+    pub(crate) fn recv<T, F>(&mut self, mut f: F)
     where
         F: FnMut(ClientTypeRef, Message<T>),
         T: DecodeOwned,
@@ -49,7 +49,7 @@ impl IpClient {
                 match n {
                     NetworkEvent::Message(m) => {
                         let src = m.src.into();
-                        let data = unpack(&m.data, compression);
+                        let data = unpack(&m.data);
                         f(ClientTypeRef::Ip(self), Message { src, data })
                     }
                     NetworkEvent::PeerConnected(peer) => {

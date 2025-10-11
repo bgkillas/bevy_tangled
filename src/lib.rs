@@ -10,7 +10,7 @@ use crate::steam::SteamClient;
 use bevy_app::{App, Plugin};
 #[cfg(feature = "bevy")]
 use bevy_ecs::resource::Resource;
-use bitcode::Encode;
+use bitcode::{Decode, Encode};
 use bitcode::{DecodeOwned, decode, encode};
 #[cfg(feature = "compress")]
 use lz4_flex::{compress_prepend_size, decompress_size_prepended};
@@ -47,29 +47,34 @@ impl PeerId {
         self.0
     }
 }
-#[allow(unused_variables)]
+#[derive(Encode, Decode)]
+pub enum MsgType {
+    Compressed(Vec<u8>),
+    Uncompressed(Vec<u8>), //TODO should be 'a T, or Cow<'a, T>, etc
+}
 pub(crate) fn pack<T: Encode>(data: &T, compression: Compression) -> Vec<u8> {
     let data = encode(data);
     #[cfg(feature = "compress")]
     {
-        if compression == Compression::Compressed {
-            compress_prepend_size(&data)
+        let data = if compression == Compression::Compressed {
+            MsgType::Compressed(compress_prepend_size(&data))
         } else {
-            data.to_vec()
-        }
+            MsgType::Uncompressed(data)
+        };
+        encode(&data)
     }
     #[cfg(not(feature = "compress"))]
     {
-        data.to_vec()
+        data
     }
 }
-#[allow(unused_variables)]
-pub(crate) fn unpack<T: DecodeOwned>(data: &[u8], compression: Compression) -> T {
+pub(crate) fn unpack<T: DecodeOwned>(data: &[u8]) -> T {
     #[cfg(feature = "compress")]
-    let data = if compression == Compression::Compressed {
-        &decompress_size_prepended(data).unwrap()
-    } else {
-        data
+    let data: MsgType = decode(data).unwrap();
+    #[cfg(feature = "compress")]
+    let data = &match data {
+        MsgType::Compressed(data) => decompress_size_prepended(&data).unwrap(),
+        MsgType::Uncompressed(data) => data,
     };
     decode(data).unwrap()
 }
@@ -102,7 +107,7 @@ impl Client {
             client: ClientType::None,
         }
     }
-    pub fn recv<T, F>(&mut self, compression: Compression, f: F)
+    pub fn recv<T, F>(&mut self, f: F)
     where
         F: FnMut(ClientTypeRef, Message<T>),
         T: DecodeOwned,
@@ -110,9 +115,9 @@ impl Client {
         match &mut self.client {
             ClientType::None => {}
             #[cfg(feature = "steam")]
-            ClientType::Steam(client) => client.recv(f, compression),
+            ClientType::Steam(client) => client.recv(f),
             #[cfg(feature = "tangled")]
-            ClientType::Ip(client) => client.recv(f, compression),
+            ClientType::Ip(client) => client.recv(f),
         }
     }
     pub fn recv_raw<F>(&mut self, f: F)
@@ -472,15 +477,27 @@ async fn test_ip() {
             Compression::Uncompressed,
         )
         .unwrap();
+    peer2
+        .broadcast(
+            &[0u8, 1, 5, 3],
+            Reliability::Reliable,
+            Compression::Compressed,
+        )
+        .unwrap();
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
     let mut has = false;
-    peer1.recv::<[u8; 4], _>(Compression::Uncompressed, |_, m| {
-        has = m.data == [0, 1, 5, 3]
+    let mut n = 0;
+    peer1.recv::<[u8; 4], _>(|_, m| {
+        has = m.data == [0, 1, 5, 3];
+        assert!(has);
+        n += 1;
     });
     assert!(has);
+    assert_eq!(n, 2);
     let mut has = false;
-    host.recv::<[u8; 4], _>(Compression::Uncompressed, |_, m| {
-        has = m.data == [0, 1, 5, 3]
+    host.recv::<[u8; 4], _>(|_, m| {
+        has = m.data == [0, 1, 5, 3];
+        assert!(has);
     });
     assert!(has)
 }

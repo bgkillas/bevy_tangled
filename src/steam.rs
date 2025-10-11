@@ -110,7 +110,7 @@ impl SteamClient {
             }
         })
     }
-    pub(crate) fn recv<T, F>(&mut self, mut f: F, compression: Compression)
+    pub(crate) fn recv<T, F>(&mut self, mut f: F)
     where
         F: FnMut(ClientTypeRef, Message<T>),
         T: DecodeOwned,
@@ -119,7 +119,7 @@ impl SteamClient {
         while !self.buffer.is_empty() {
             for m in &self.buffer {
                 let src = m.identity_peer().steam_id().unwrap().into();
-                let data = unpack(m.data(), compression);
+                let data = unpack(m.data());
                 f(ClientTypeRef::Steam(self), Message { src, data })
             }
             self.buffer.clear();
