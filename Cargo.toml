@@ -20,6 +20,6 @@ tangled = {git="https://github.com/intquant/tangled", optional = true, default-f
 bevy_app = { version = "0.17.2", default-features = false, optional = true }
 bevy_ecs = { version = "0.17.2", default-features = false, optional = true }
 lz4_flex = {version="0.11.5", default-features = false, optional = true}
-bitcode = {git="https://github.com/SoftbearStudios/bitcode.git", version="0.6.7", branch = "large_c_style_enums"}
+bitcode = {git="https://github.com/SoftbearStudios/bitcode", version="0.6.7", branch = "large_c_style_enums"}
 tokio = "1.47.1"
 log = {version="0.4.28", optional = true}

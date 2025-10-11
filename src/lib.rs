@@ -12,9 +12,11 @@ use bevy_app::{App, Plugin};
 use bevy_ecs::resource::Resource;
 use bitcode::Encode;
 use bitcode::{DecodeOwned, decode, encode};
+#[cfg(feature = "compress")]
 use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+#[cfg(feature = "steam")]
 use steamworks::SteamError;
 #[cfg(feature = "steam")]
 use steamworks::networking_types::NetConnectionRealTimeInfo;
@@ -407,7 +409,9 @@ pub trait ClientTrait {
 }
 #[derive(Debug)]
 pub enum NetError {
+    #[cfg(feature = "tangled")]
     Tangled(tangled::NetError),
+    #[cfg(feature = "steam")]
     Steam(SteamError),
 }
 impl Display for NetError {
@@ -415,11 +419,13 @@ impl Display for NetError {
         write!(f, "{self:?}")
     }
 }
+#[cfg(feature = "tangled")]
 impl From<tangled::NetError> for NetError {
     fn from(value: tangled::NetError) -> Self {
         Self::Tangled(value)
     }
 }
+#[cfg(feature = "steam")]
 impl From<SteamError> for NetError {
     fn from(value: SteamError) -> Self {
         Self::Steam(value)

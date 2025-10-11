@@ -180,7 +180,7 @@ version = "0.1.0"
 dependencies = [
  "bevy_app",
  "bevy_ecs",
- "bitcode 0.6.7 (git+https://github.com/SoftbearStudios/bitcode.git?branch=large_c_style_enums)",
+ "bitcode 0.6.7 (git+https://github.com/SoftbearStudios/bitcode?branch=large_c_style_enums)",
  "log",
  "lz4_flex",
  "steamworks",
@@ -231,10 +231,10 @@ dependencies = [
 [[package]]
 name = "bitcode"
 version = "0.6.7"
-source = "git+https://github.com/SoftbearStudios/bitcode.git?branch=large_c_style_enums#a4603205a08239965198e10b86ac5e55a67338b9"
+source = "git+https://github.com/SoftbearStudios/bitcode?branch=large_c_style_enums#a4603205a08239965198e10b86ac5e55a67338b9"
 dependencies = [
  "arrayvec",
- "bitcode_derive 0.6.7 (git+https://github.com/SoftbearStudios/bitcode.git?branch=large_c_style_enums)",
+ "bitcode_derive 0.6.7 (git+https://github.com/SoftbearStudios/bitcode?branch=large_c_style_enums)",
  "bytemuck",
  "glam",
  "serde",
@@ -254,7 +254,7 @@ dependencies = [
 [[package]]
 name = "bitcode_derive"
 version = "0.6.7"
-source = "git+https://github.com/SoftbearStudios/bitcode.git?branch=large_c_style_enums#a4603205a08239965198e10b86ac5e55a67338b9"
+source = "git+https://github.com/SoftbearStudios/bitcode?branch=large_c_style_enums#a4603205a08239965198e10b86ac5e55a67338b9"
 dependencies = [
  "proc-macro2",
  "quote",
