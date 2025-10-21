@@ -15,11 +15,11 @@ compress=["dep:lz4_flex"]
 log=["dep:log", "tangled/log"]
 
 [dependencies]
-steamworks = {git="https://github.com/bgkillas/steamworks-rs", optional = true}
-tangled = {git="https://github.com/intquant/tangled", optional = true, default-features = false}
+steamworks = {git="https://github.com/bgkillas/steamworks-rs", version="0.12.2", optional = true}
+tangled = {git="https://github.com/intquant/tangled", version="0.4.0", optional = true, default-features = false}
 bevy_app = { version = "0.17.2", default-features = false, optional = true }
 bevy_ecs = { version = "0.17.2", default-features = false, optional = true }
 lz4_flex = {version="0.11.5", default-features = false, optional = true}
 bitcode = {git="https://github.com/SoftbearStudios/bitcode", version="0.6.7", branch = "large_c_style_enums"}
-tokio = "1.47.1"
+tokio = "1.48.0"
 log = {version="0.4.28", optional = true}
