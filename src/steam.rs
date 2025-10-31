@@ -345,13 +345,6 @@ impl Client {
         };
         client.join(LobbyId::from_raw(lobby));
     }
-    pub fn args(&self) -> String {
-        if let ClientType::Steam(client) = &self.client {
-            client.steam_client.apps().launch_command_line()
-        } else {
-            String::new()
-        }
-    }
     pub fn flush(&self) {
         if let ClientType::Steam(client) = &self.client {
             client.connections.values().for_each(|c| {

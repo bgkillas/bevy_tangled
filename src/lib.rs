@@ -35,7 +35,7 @@ pub enum Compression {
     Compressed,
     Uncompressed,
 }
-#[derive(Copy, Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Encode, Decode, Copy, Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
 pub struct PeerId(pub u64);
 impl Display for PeerId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
