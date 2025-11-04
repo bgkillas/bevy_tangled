@@ -158,9 +158,7 @@ impl SteamClient {
         );
     }
     pub(crate) fn update(&mut self) {
-        let recv = self.rx.clone();
-        let recv = recv.lock().unwrap();
-        while let Ok(event) = recv.try_recv() {
+        while let Ok(event) = self.rx.clone().lock().unwrap().try_recv() {
             self.lobby_id = event;
             if !self.is_host() {
                 let matchmaking = self.steam_client.matchmaking();
@@ -173,51 +171,6 @@ impl SteamClient {
                 }
             }
         }
-        self.steam_client
-            .clone()
-            .process_callbacks(|callback| match callback {
-                CallbackResult::GameLobbyJoinRequested(GameLobbyJoinRequested {
-                    lobby_steam_id,
-                    ..
-                }) => self.join(lobby_steam_id),
-                CallbackResult::NetConnectionStatusChanged(NetConnectionStatusChanged {
-                    connection_info,
-                    ..
-                }) => match connection_info.state() {
-                    Ok(NetworkingConnectionState::Connected) => {
-                        let peer = connection_info
-                            .identity_remote()
-                            .unwrap()
-                            .steam_id()
-                            .unwrap();
-                        if let Some(con) = self.connections.get_mut(&peer.into()) {
-                            #[cfg(feature = "log")]
-                            info!("connected to {peer:?}");
-                            con.connected = true;
-                            if let Some(mut c) = self.peer_connected.take() {
-                                c(ClientTypeRef::Steam(self), peer.into());
-                                self.peer_connected = Some(c);
-                            }
-                        }
-                    }
-                    Ok(NetworkingConnectionState::ClosedByPeer) => {
-                        let peer = connection_info
-                            .identity_remote()
-                            .unwrap()
-                            .steam_id()
-                            .unwrap();
-                        self.connections.remove(&peer.into());
-                        #[cfg(feature = "log")]
-                        info!("disconnected from {peer:?}");
-                        if let Some(mut d) = self.peer_disconnected.take() {
-                            d(ClientTypeRef::Steam(self), peer.into());
-                            self.peer_disconnected = Some(d);
-                        }
-                    }
-                    _ => {}
-                },
-                _ => {}
-            });
         if let Some(listen) = &self.listen_socket {
             let listen = listen.lock().unwrap();
             while let Some(event) = listen.try_receive_event() {
@@ -255,6 +208,52 @@ impl SteamClient {
                     }
                 }
             }
+        } else {
+            self.steam_client
+                .clone()
+                .process_callbacks(|callback| match callback {
+                    CallbackResult::GameLobbyJoinRequested(GameLobbyJoinRequested {
+                        lobby_steam_id,
+                        ..
+                    }) => self.join(lobby_steam_id),
+                    CallbackResult::NetConnectionStatusChanged(NetConnectionStatusChanged {
+                        connection_info,
+                        ..
+                    }) => match connection_info.state() {
+                        Ok(NetworkingConnectionState::Connected) => {
+                            let peer = connection_info
+                                .identity_remote()
+                                .unwrap()
+                                .steam_id()
+                                .unwrap();
+                            if let Some(con) = self.connections.get_mut(&peer.into()) {
+                                #[cfg(feature = "log")]
+                                info!("connected to {peer:?}");
+                                con.connected = true;
+                                if let Some(mut c) = self.peer_connected.take() {
+                                    c(ClientTypeRef::Steam(self), peer.into());
+                                    self.peer_connected = Some(c);
+                                }
+                            }
+                        }
+                        Ok(NetworkingConnectionState::ClosedByPeer) => {
+                            let peer = connection_info
+                                .identity_remote()
+                                .unwrap()
+                                .steam_id()
+                                .unwrap();
+                            self.connections.remove(&peer.into());
+                            #[cfg(feature = "log")]
+                            info!("disconnected from {peer:?}");
+                            if let Some(mut d) = self.peer_disconnected.take() {
+                                d(ClientTypeRef::Steam(self), peer.into());
+                                self.peer_disconnected = Some(d);
+                            }
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                });
         }
     }
 }
