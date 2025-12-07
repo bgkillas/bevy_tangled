@@ -81,7 +81,7 @@ pub(crate) fn unpack<T: DecodeOwned>(data: &[u8]) -> T {
 pub(crate) enum ClientType {
     None,
     #[cfg(feature = "steam")]
-    Steam(SteamClient),
+    Steam(Box<SteamClient>),
     #[cfg(feature = "tangled")]
     Ip(IpClient),
 }
