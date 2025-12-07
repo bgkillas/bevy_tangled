@@ -326,9 +326,11 @@ impl ClientTrait for SteamClient {
         self.connections.len()
     }
     fn is_connected(&self) -> bool {
-        self.connections
-            .get(&self.host_id)
-            .is_some_and(|a| a.connected)
+        self.is_host()
+            || self
+                .connections
+                .get(&self.host_id)
+                .is_some_and(|a| a.connected)
     }
 }
 impl From<Reliability> for SendFlags {
