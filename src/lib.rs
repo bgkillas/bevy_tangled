@@ -193,6 +193,9 @@ impl ClientTrait for Client {
     fn peer_len(&self) -> usize {
         self.client.peer_len()
     }
+    fn is_connected(&self) -> bool {
+        self.client.is_connected()
+    }
 }
 impl ClientTrait for ClientType {
     fn send<T: Encode>(
@@ -285,6 +288,15 @@ impl ClientTrait for ClientType {
             Self::Steam(client) => client.peer_len(),
             #[cfg(feature = "tangled")]
             Self::Ip(client) => client.peer_len(),
+        }
+    }
+    fn is_connected(&self) -> bool {
+        match &self {
+            Self::None => false,
+            #[cfg(feature = "steam")]
+            Self::Steam(client) => client.is_connected(),
+            #[cfg(feature = "tangled")]
+            Self::Ip(client) => client.is_connected(),
         }
     }
 }
@@ -389,6 +401,16 @@ impl ClientTrait for ClientTypeRef<'_> {
             Self::Ip(client) => client.peer_len(),
         }
     }
+    fn is_connected(&self) -> bool {
+        match &self {
+            #[cfg(not(any(feature = "steam", feature = "tangled")))]
+            Self::None(_) => false,
+            #[cfg(feature = "steam")]
+            Self::Steam(client) => client.is_connected(),
+            #[cfg(feature = "tangled")]
+            Self::Ip(client) => client.is_connected(),
+        }
+    }
 }
 pub trait ClientTrait {
     fn send<T: Encode>(
@@ -411,6 +433,7 @@ pub trait ClientTrait {
     fn host_id(&self) -> PeerId;
     fn is_host(&self) -> bool;
     fn peer_len(&self) -> usize;
+    fn is_connected(&self) -> bool;
 }
 #[derive(Debug)]
 pub enum NetError {

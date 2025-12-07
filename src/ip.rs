@@ -149,6 +149,9 @@ impl ClientTrait for IpClient {
     fn peer_len(&self) -> usize {
         self.peer.iter_peer_ids().count()
     }
+    fn is_connected(&self) -> bool {
+        self.connected
+    }
 }
 impl From<Reliability> for tangled::Reliability {
     fn from(value: Reliability) -> Self {

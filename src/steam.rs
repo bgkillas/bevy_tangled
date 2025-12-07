@@ -307,6 +307,9 @@ impl ClientTrait for SteamClient {
     fn peer_len(&self) -> usize {
         self.connections.len()
     }
+    fn is_connected(&self) -> bool {
+        self.host_id != PeerId(0)
+    }
 }
 impl From<Reliability> for SendFlags {
     fn from(value: Reliability) -> Self {
