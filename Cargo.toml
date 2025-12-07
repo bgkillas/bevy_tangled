@@ -22,4 +22,4 @@ bevy_ecs = { version = "0.17.3", default-features = false, optional = true }
 lz4_flex = {version="0.12.0", default-features = false, optional = true}
 bitcode = {git="https://github.com/SoftbearStudios/bitcode", version="0.6.7", branch = "large_c_style_enums"}
 tokio = "1.48.0"
-log = {version="0.4.28", optional = true}
+log = {version="0.4.29", optional = true}
