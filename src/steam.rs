@@ -5,6 +5,7 @@ use crate::{
 use bitcode::{DecodeOwned, Encode};
 #[cfg(feature = "log")]
 use log::info;
+use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
@@ -31,7 +32,7 @@ pub struct SteamClient {
     pub(crate) peer_connected: ClientCallback,
     pub(crate) peer_disconnected: ClientCallback,
     pub(crate) buffer: Vec<NetworkingMessage>,
-    pub(crate) send_buffer: Mutex<Vec<(PeerId, Vec<u8>)>>,
+    pub(crate) send_buffer: RefCell<Vec<(PeerId, Vec<u8>)>>,
     rx: Arc<Mutex<Receiver<LobbyId>>>,
     tx: Arc<Mutex<Sender<LobbyId>>>,
 }
@@ -199,7 +200,7 @@ impl SteamClient {
                                 c(ClientTypeRef::Steam(self), peer);
                                 self.peer_connected = Some(c);
                             }
-                            let mut buffer = self.send_buffer.lock().unwrap();
+                            let mut buffer = self.send_buffer.borrow_mut();
                             for data in buffer
                                 .iter()
                                 .filter_map(|(p, d)| if *p == peer { Some(d) } else { None })
@@ -296,7 +297,7 @@ impl ClientTrait for SteamClient {
         {
             con.net.send_message(data, reliability.into())?;
         } else {
-            self.send_buffer.lock().unwrap().push((dest, data.to_vec()))
+            self.send_buffer.borrow_mut().push((dest, data.to_vec()))
         }
         Ok(())
     }
@@ -305,10 +306,7 @@ impl ClientTrait for SteamClient {
             if con.connected {
                 con.net.send_message(data, reliability.into())?;
             } else {
-                self.send_buffer
-                    .lock()
-                    .unwrap()
-                    .push((*dest, data.to_vec()))
+                self.send_buffer.borrow_mut().push((*dest, data.to_vec()))
             }
         }
         Ok(())
