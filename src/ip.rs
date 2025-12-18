@@ -53,7 +53,9 @@ impl IpClient {
                         f(ClientTypeRef::Ip(self), Message { src, data })
                     }
                     NetworkEvent::PeerConnected(peer) => {
-                        if let Some(mut c) = self.peer_connected.take() {
+                        if PeerId::from(peer) != self.my_id()
+                            && let Some(mut c) = self.peer_connected.take()
+                        {
                             c(ClientTypeRef::Ip(self), peer.into());
                             self.peer_connected = Some(c);
                         }
