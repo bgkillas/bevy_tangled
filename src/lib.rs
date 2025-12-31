@@ -8,6 +8,7 @@ use crate::ip::IpClient;
 use crate::steam::SteamClient;
 #[cfg(feature = "bevy")]
 use bevy_app::{App, Plugin};
+use bevy_ecs::component::Component;
 #[cfg(feature = "bevy")]
 use bevy_ecs::resource::Resource;
 use bitcode::{Decode, Encode};
@@ -16,6 +17,7 @@ use bitcode::{DecodeOwned, decode, encode};
 use lz4_flex::{compress_prepend_size, decompress_size_prepended};
 use std::error::Error;
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 #[cfg(feature = "steam")]
 use steamworks::SteamError;
 #[cfg(feature = "steam")]
@@ -35,8 +37,14 @@ pub enum Compression {
     Compressed,
     Uncompressed,
 }
-#[derive(Encode, Decode, Copy, Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
+#[derive(Encode, Decode, Copy, Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq, Component)]
 pub struct PeerId(pub u64);
+impl Deref for PeerId {
+    type Target = u64;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
 impl Display for PeerId {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
