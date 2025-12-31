@@ -375,6 +375,18 @@ impl Client {
             })
         }
     }
+    pub fn set_rich_presence(&self, key: &str, value: Option<&str>) -> bool {
+        if let ClientType::Steam(client) = &self.client {
+            client.steam_client.friends().set_rich_presence(key, value)
+        } else {
+            true
+        }
+    }
+    pub fn clear_rich_presence(&self) {
+        if let ClientType::Steam(client) = &self.client {
+            client.steam_client.friends().clear_rich_presence()
+        }
+    }
     pub fn init_steam(
         &mut self,
         peer_connected: ClientCallback,
