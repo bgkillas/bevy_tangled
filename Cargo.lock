@@ -1393,7 +1393,7 @@ dependencies = [
 [[package]]
 name = "tangled"
 version = "0.5.0"
-source = "git+https://github.com/intquant/tangled#f1b5d7e3f6fe5a67f24c1b3e458009cab02696d1"
+source = "git+https://github.com/intquant/tangled#2a1e453593f43e3eda09f507e3274b463320ab45"
 dependencies = [
  "bitcode 0.6.9",
  "crossbeam",
