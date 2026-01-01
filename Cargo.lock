@@ -196,11 +196,11 @@ dependencies = [
  "bevy_app",
  "bevy_ecs",
  "bitcode 0.6.7",
- "log",
  "lz4_flex",
  "steamworks",
  "tangled",
  "tokio",
+ "tracing",
 ]
 
 [[package]]

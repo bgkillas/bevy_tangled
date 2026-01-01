@@ -3,8 +3,6 @@ use crate::{
     NetworkingInfo, PeerId, Reliability, pack, unpack,
 };
 use bitcode::{DecodeOwned, Encode};
-#[cfg(feature = "log")]
-use log::info;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender, channel};
@@ -17,6 +15,8 @@ use steamworks::networking_types::{
 use steamworks::{
     CallbackResult, GameLobbyJoinRequested, LobbyId, LobbyType, SteamAPIInitError, SteamId,
 };
+#[cfg(feature = "log")]
+use tracing::info;
 pub(crate) struct Connection {
     pub(crate) net: NetConnection,
     pub(crate) connected: bool,

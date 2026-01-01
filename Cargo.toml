@@ -12,7 +12,7 @@ steam=["dep:steamworks"]
 tangled=["dep:tangled"]
 bevy=["dep:bevy_app", "dep:bevy_ecs"]
 compress=["dep:lz4_flex"]
-log=["dep:log", "tangled/log"]
+log=["dep:tracing", "tangled/log"]
 
 [dependencies]
 steamworks = {git="https://github.com/bgkillas/steamworks-rs", version="0.12.2", optional = true}
@@ -22,4 +22,4 @@ bevy_ecs = { version = "0.17.3", default-features = false, optional = true }
 lz4_flex = {version="0.12.0", default-features = false, optional = true}
 bitcode = {git="https://github.com/SoftbearStudios/bitcode", version="0.6.7", branch = "large_c_style_enums"}
 tokio = "1.48.0"
-log = {version="0.4.29", optional = true}
+tracing = {version="0.1.44", optional = true}
