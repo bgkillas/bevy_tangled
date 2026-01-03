@@ -55,21 +55,20 @@ impl PeerId {
         self.0
     }
 }
-#[derive(Encode, Decode)]
-pub enum MsgType {
-    Compressed(Vec<u8>),
-    Uncompressed(Vec<u8>), //TODO should be 'a T, or Cow<'a, T>, etc
-}
 pub(crate) fn pack<T: Encode>(data: &T, compression: Compression) -> Vec<u8> {
-    let data = encode(data);
+    let mut data = encode(data);
     #[cfg(feature = "compress")]
     {
-        let data = if compression == Compression::Compressed {
-            MsgType::Compressed(compress_prepend_size(&data))
-        } else {
-            MsgType::Uncompressed(data)
+        match compression {
+            Compression::Compressed => {
+                data = compress_prepend_size(&data);
+                data.push(1);
+            }
+            Compression::Uncompressed => {
+                data.push(0);
+            }
         };
-        encode(&data)
+        data
     }
     #[cfg(not(feature = "compress"))]
     {
@@ -78,11 +77,10 @@ pub(crate) fn pack<T: Encode>(data: &T, compression: Compression) -> Vec<u8> {
 }
 pub(crate) fn unpack<T: DecodeOwned>(data: &[u8]) -> T {
     #[cfg(feature = "compress")]
-    let data: MsgType = decode(data).unwrap();
-    #[cfg(feature = "compress")]
-    let data = &match data {
-        MsgType::Compressed(data) => decompress_size_prepended(&data).unwrap(),
-        MsgType::Uncompressed(data) => data,
+    let data = if *data.last().unwrap() == 1 {
+        &decompress_size_prepended(&data[..data.len() - 1]).unwrap()
+    } else {
+        &data[..data.len() - 1]
     };
     decode(data).unwrap()
 }
