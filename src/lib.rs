@@ -476,7 +476,7 @@ impl Plugin for Client {
         });
     }
 }
-#[cfg(feature = "steam")]
+#[cfg(all(feature = "steam", feature = "bevy"))]
 pub fn update(mut client: bevy_ecs::system::ResMut<Client>) {
     client.update()
 }
