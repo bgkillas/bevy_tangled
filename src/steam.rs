@@ -13,7 +13,8 @@ use steamworks::networking_types::{
     NetworkingMessage, SendFlags,
 };
 use steamworks::{
-    CallbackResult, GameLobbyJoinRequested, LobbyId, LobbyType, SteamAPIInitError, SteamId,
+    CallbackResult, DistanceFilter, GameLobbyJoinRequested, LobbyId, LobbyType, SteamAPIInitError,
+    SteamId,
 };
 #[cfg(feature = "log")]
 use tracing::info;
@@ -33,6 +34,7 @@ pub struct SteamClient {
     pub(crate) peer_disconnected: ClientCallback,
     pub(crate) buffer: Vec<NetworkingMessage>,
     pub(crate) send_buffer: RefCell<Vec<(PeerId, Vec<u8>)>>,
+    pub(crate) lobby_list: Arc<Mutex<Option<Vec<LobbyId>>>>,
     rx: Arc<Mutex<Receiver<LobbyId>>>,
     tx: Arc<Mutex<Sender<LobbyId>>>,
 }
@@ -66,6 +68,9 @@ impl SteamClient {
     ) -> Result<Self, SteamAPIInitError> {
         let steam_client = steamworks::Client::init_app(app_id)?;
         steam_client.networking_utils().init_relay_network_access();
+        steam_client
+            .matchmaking()
+            .set_request_lobby_list_distance_filter(DistanceFilter::Worldwide);
         let poll_group = steam_client.networking_sockets().create_poll_group();
         let my_id = steam_client.user().steam_id().into();
         let (tx, rx) = channel();
@@ -78,6 +83,7 @@ impl SteamClient {
             poll_group,
             peer_connected,
             peer_disconnected,
+            lobby_list: Default::default(),
             buffer: Vec::with_capacity(64),
             listen_socket: None,
             send_buffer: Vec::with_capacity(32).into(),
@@ -324,7 +330,7 @@ impl ClientTrait for SteamClient {
         self.connections.len()
     }
     fn is_connected(&self) -> bool {
-        self.is_host()
+        (self.is_host() && self.lobby_id.raw() != 0)
             || self
                 .connections
                 .get(&self.host_id)
@@ -400,5 +406,38 @@ impl Client {
             )?));
         }
         Ok(())
+    }
+    pub fn get_name(&self) -> Option<String> {
+        if let ClientType::Steam(client) = &self.client {
+            Some(client.steam_client.friends().name())
+        } else {
+            None
+        }
+    }
+    pub fn get_name_of(&self, id: PeerId) -> Option<String> {
+        if let ClientType::Steam(client) = &self.client {
+            Some(client.steam_client.friends().get_friend(id.into()).name())
+        } else {
+            None
+        }
+    }
+    pub fn update_lobby_list(&mut self) {
+        let ClientType::Steam(client) = &mut self.client else {
+            return;
+        };
+        client.lobby_list = Default::default();
+        let list = client.lobby_list.clone();
+        client
+            .steam_client
+            .matchmaking()
+            .request_lobby_list(move |data| {
+                *list.lock().unwrap() = data.ok();
+            });
+    }
+    pub fn lobby_list(&self) -> Option<Vec<LobbyId>> {
+        let ClientType::Steam(client) = &self.client else {
+            return None;
+        };
+        client.lobby_list.lock().unwrap().clone()
     }
 }

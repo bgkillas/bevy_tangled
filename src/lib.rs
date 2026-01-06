@@ -474,11 +474,9 @@ impl Plugin for Client {
             app_id: self.app_id,
             client: ClientType::None,
         });
-        #[cfg(feature = "steam")]
-        app.add_systems(bevy_app::First, update);
     }
 }
-#[cfg(feature = "bevy")]
+#[cfg(feature = "steam")]
 pub fn update(mut client: bevy_ecs::system::ResMut<Client>) {
     client.update()
 }
