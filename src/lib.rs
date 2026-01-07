@@ -20,6 +20,8 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 #[cfg(feature = "steam")]
+pub use steamworks::LobbyId;
+#[cfg(feature = "steam")]
 pub use steamworks::SteamError;
 #[cfg(feature = "steam")]
 use steamworks::networking_types::NetConnectionRealTimeInfo;

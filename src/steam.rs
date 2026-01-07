@@ -363,13 +363,13 @@ impl Client {
         };
         client.host()
     }
-    pub fn join_steam(&mut self, lobby: impl Into<LobbyId>) {
+    pub fn join_steam(&mut self, lobby: LobbyId) {
         let ClientType::Steam(client) = &mut self.client else {
             #[cfg(feature = "log")]
             log!("steam not initialized, not joining");
             return;
         };
-        client.join(lobby.into());
+        client.join(lobby);
     }
     pub fn flush(&self) {
         if let ClientType::Steam(client) = &self.client {
@@ -429,9 +429,9 @@ impl Client {
             None
         }
     }
-    pub fn get_lobby_data(&self, id: impl Into<LobbyId>, key: &str) -> Option<String> {
+    pub fn get_lobby_data(&self, id: LobbyId, key: &str) -> Option<String> {
         if let ClientType::Steam(client) = &self.client {
-            client.steam_client.matchmaking().lobby_data(id.into(), key)
+            client.steam_client.matchmaking().lobby_data(id, key)
         } else {
             None
         }
@@ -443,12 +443,12 @@ impl Client {
             self.set_lobby_data(client.lobby_id, key, value);
         }
     }
-    pub fn set_lobby_data(&self, id: impl Into<LobbyId>, key: &str, value: &str) {
+    pub fn set_lobby_data(&self, id: LobbyId, key: &str, value: &str) {
         if let ClientType::Steam(client) = &self.client {
             client
                 .steam_client
                 .matchmaking()
-                .set_lobby_data(id.into(), key, value);
+                .set_lobby_data(id, key, value);
         }
     }
     pub fn update_lobby_list(&mut self) {
