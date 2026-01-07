@@ -8,6 +8,7 @@ use crate::ip::IpClient;
 use crate::steam::SteamClient;
 #[cfg(feature = "bevy")]
 use bevy_app::{App, Plugin};
+#[cfg(feature = "bevy")]
 use bevy_ecs::component::Component;
 #[cfg(feature = "bevy")]
 use bevy_ecs::resource::Resource;
@@ -19,7 +20,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 #[cfg(feature = "steam")]
-use steamworks::SteamError;
+pub use steamworks::SteamError;
 #[cfg(feature = "steam")]
 use steamworks::networking_types::NetConnectionRealTimeInfo;
 type ClientCallback = Option<Box<dyn FnMut(ClientTypeRef, PeerId) + Send + Sync + 'static>>;
@@ -37,7 +38,8 @@ pub enum Compression {
     Compressed,
     Uncompressed,
 }
-#[derive(Encode, Decode, Copy, Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq, Component)]
+#[derive(Encode, Decode, Copy, Debug, Clone, Hash, PartialEq, PartialOrd, Ord, Eq)]
+#[cfg_attr(feature = "bevy", derive(Component))]
 pub struct PeerId(pub u64);
 impl Deref for PeerId {
     type Target = u64;
@@ -55,7 +57,9 @@ impl PeerId {
         self.0
     }
 }
+#[allow(unused_variables)]
 pub(crate) fn pack<T: Encode>(data: &T, compression: Compression) -> Vec<u8> {
+    #[allow(unused_mut)]
     let mut data = encode(data);
     #[cfg(feature = "compress")]
     {
@@ -105,12 +109,21 @@ pub struct Client {
     #[cfg(feature = "steam")]
     app_id: u32,
 }
+impl Default for Client {
+    fn default() -> Self {
+        Self {
+            #[cfg(feature = "steam")]
+            app_id: 480,
+            client: ClientType::None,
+        }
+    }
+}
 impl Client {
     pub fn new(#[cfg(feature = "steam")] app_id: u32) -> Self {
         Self {
             #[cfg(feature = "steam")]
             app_id,
-            client: ClientType::None,
+            ..Self::default()
         }
     }
     pub fn recv<T, F>(&mut self, f: F)
@@ -138,14 +151,16 @@ impl Client {
             ClientType::Ip(client) => client.recv_raw(f),
         }
     }
-    pub fn update(&mut self) {
+    #[allow(clippy::result_unit_err)]
+    pub fn update(&mut self) -> UResult {
         match &mut self.client {
             ClientType::None => {}
             #[cfg(feature = "steam")]
-            ClientType::Steam(client) => client.update(),
+            ClientType::Steam(client) => return client.update(),
             #[cfg(feature = "tangled")]
             ClientType::Ip(client) => client.update(),
         }
+        Ok(())
     }
     pub fn info(&self) -> Option<NetworkingInfo> {
         match &self.client {
@@ -157,6 +172,10 @@ impl Client {
         }
     }
 }
+#[cfg(feature = "steam")]
+type UResult = Result<(), SteamError>;
+#[cfg(not(feature = "steam"))]
+type UResult = Result<(), ()>;
 pub struct NetworkingInfo(#[cfg(feature = "steam")] pub Vec<(PeerId, NetConnectionRealTimeInfo)>);
 impl ClientTrait for Client {
     fn send<T: Encode>(
@@ -476,9 +495,9 @@ impl Plugin for Client {
         });
     }
 }
-#[cfg(all(feature = "steam", feature = "bevy"))]
+#[cfg(feature = "bevy")]
 pub fn update(mut client: bevy_ecs::system::ResMut<Client>) {
-    client.update()
+    let _ = client.update();
 }
 #[cfg(feature = "tangled")]
 #[cfg(test)]
@@ -495,8 +514,8 @@ async fn test_ip() {
         .join_ip("127.0.0.1".parse().unwrap(), None, None)
         .unwrap();
     tokio::time::sleep(std::time::Duration::from_millis(20)).await;
-    peer1.update();
-    peer2.update();
+    let _ = peer1.update();
+    let _ = peer2.update();
     peer2
         .broadcast(
             &[0u8, 1, 5, 3],

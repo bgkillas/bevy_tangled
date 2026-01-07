@@ -14,7 +14,7 @@ use steamworks::networking_types::{
 };
 use steamworks::{
     CallbackResult, DistanceFilter, GameLobbyJoinRequested, LobbyId, LobbyType, SteamAPIInitError,
-    SteamId,
+    SteamError, SteamId,
 };
 #[cfg(feature = "log")]
 use tracing::info;
@@ -34,9 +34,10 @@ pub struct SteamClient {
     pub(crate) peer_disconnected: ClientCallback,
     pub(crate) buffer: Vec<NetworkingMessage>,
     pub(crate) send_buffer: RefCell<Vec<(PeerId, Vec<u8>)>>,
-    pub(crate) lobby_list: Arc<Mutex<Option<Vec<LobbyId>>>>,
-    rx: Arc<Mutex<Receiver<LobbyId>>>,
-    tx: Arc<Mutex<Sender<LobbyId>>>,
+    #[allow(clippy::type_complexity)]
+    pub(crate) lobby_list: Arc<Mutex<Option<Result<Vec<LobbyId>, SteamError>>>>,
+    rx: Arc<Mutex<Receiver<Result<LobbyId, SteamError>>>>,
+    tx: Arc<Mutex<Sender<Result<LobbyId, SteamError>>>>,
 }
 unsafe impl Send for SteamClient {}
 unsafe impl Sync for SteamClient {}
@@ -104,9 +105,7 @@ impl SteamClient {
         self.steam_client
             .matchmaking()
             .create_lobby(LobbyType::FriendsOnly, 250, move |s| {
-                if let Ok(s) = s {
-                    let _ = tx.lock().unwrap().send(s);
-                }
+                let _ = tx.lock().unwrap().send(s);
             });
         Ok(())
     }
@@ -114,9 +113,7 @@ impl SteamClient {
         self.reset();
         let tx = self.tx.clone();
         self.steam_client.matchmaking().join_lobby(id, move |s| {
-            if let Ok(s) = s {
-                let _ = tx.lock().unwrap().send(s);
-            }
+            let _ = tx.lock().unwrap().send(s.map_err(|_| SteamError::Generic));
         })
     }
     pub(crate) fn recv<T, F>(&mut self, mut f: F)
@@ -166,8 +163,9 @@ impl SteamClient {
             },
         );
     }
-    pub(crate) fn update(&mut self) {
+    pub(crate) fn update(&mut self) -> Result<(), SteamError> {
         while let Ok(event) = self.rx.clone().lock().unwrap().try_recv() {
+            let event = event?;
             self.lobby_id = event;
             if !self.is_host() {
                 let matchmaking = self.steam_client.matchmaking();
@@ -272,6 +270,7 @@ impl SteamClient {
                 }
             }
         }
+        Ok(())
     }
 }
 impl ClientTrait for SteamClient {
@@ -364,13 +363,13 @@ impl Client {
         };
         client.host()
     }
-    pub fn join_steam(&mut self, lobby: u64) {
+    pub fn join_steam(&mut self, lobby: LobbyId) {
         let ClientType::Steam(client) = &mut self.client else {
             #[cfg(feature = "log")]
             log!("steam not initialized, not joining");
             return;
         };
-        client.join(LobbyId::from_raw(lobby));
+        client.join(lobby);
     }
     pub fn flush(&self) {
         if let ClientType::Steam(client) = &self.client {
@@ -462,10 +461,10 @@ impl Client {
             .steam_client
             .matchmaking()
             .request_lobby_list(move |data| {
-                *list.lock().unwrap() = data.ok();
+                *list.lock().unwrap() = Some(data);
             });
     }
-    pub fn lobby_list(&self) -> Option<Vec<LobbyId>> {
+    pub fn lobby_list(&self) -> Option<Result<Vec<LobbyId>, SteamError>> {
         let ClientType::Steam(client) = &self.client else {
             return None;
         };
