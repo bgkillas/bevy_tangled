@@ -165,6 +165,9 @@ impl SteamClient {
     }
     pub(crate) fn update(&mut self) -> Result<(), SteamError> {
         while let Ok(event) = self.rx.clone().lock().unwrap().try_recv() {
+            if event.is_err() {
+                self.reset();
+            }
             let event = event?;
             self.lobby_id = event;
             if !self.is_host() {
