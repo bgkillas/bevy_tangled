@@ -1,6 +1,6 @@
 use crate::{
-    Client, ClientCallback, ClientTrait, ClientType, ClientTypeRef, Compression, Message, NetError,
-    NetworkingInfo, PeerId, Reliability, pack, unpack,
+    Client, ClientCallback, ClientMode, ClientTrait, ClientType, ClientTypeRef, Compression,
+    Message, NetError, NetworkingInfo, PeerId, Reliability, pack, unpack,
 };
 use bitcode::{DecodeOwned, Encode};
 use std::cell::RefCell;
@@ -338,6 +338,15 @@ impl ClientTrait for SteamClient {
                 .get(&self.host_id)
                 .is_some_and(|a| a.connected)
     }
+    fn mode(&self) -> ClientMode {
+        ClientMode::Steam
+    }
+    fn get_name(&self) -> Option<String> {
+        Some(self.steam_client.friends().name())
+    }
+    fn get_name_of(&self, id: PeerId) -> Option<String> {
+        Some(self.steam_client.friends().get_friend(id.into()).name())
+    }
 }
 impl From<Reliability> for SendFlags {
     fn from(value: Reliability) -> Self {
@@ -408,20 +417,6 @@ impl Client {
             )?));
         }
         Ok(())
-    }
-    pub fn get_name(&self) -> Option<String> {
-        if let ClientType::Steam(client) = &self.client {
-            Some(client.steam_client.friends().name())
-        } else {
-            None
-        }
-    }
-    pub fn get_name_of(&self, id: PeerId) -> Option<String> {
-        if let ClientType::Steam(client) = &self.client {
-            Some(client.steam_client.friends().get_friend(id.into()).name())
-        } else {
-            None
-        }
     }
     pub fn get_lobby_my_data(&self, key: &str) -> Option<String> {
         if let ClientType::Steam(client) = &self.client

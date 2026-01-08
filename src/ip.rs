@@ -1,6 +1,6 @@
 use crate::{
-    Client, ClientCallback, ClientTrait, ClientType, ClientTypeRef, Compression, Message, NetError,
-    PeerId, Reliability, pack, unpack,
+    Client, ClientCallback, ClientMode, ClientTrait, ClientType, ClientTypeRef, Compression,
+    Message, NetError, PeerId, Reliability, pack, unpack,
 };
 use bitcode::{DecodeOwned, Encode};
 use std::net::{IpAddr, SocketAddr};
@@ -153,6 +153,15 @@ impl ClientTrait for IpClient {
     }
     fn is_connected(&self) -> bool {
         self.connected
+    }
+    fn mode(&self) -> ClientMode {
+        ClientMode::Ip
+    }
+    fn get_name(&self) -> Option<String> {
+        None
+    }
+    fn get_name_of(&self, _: PeerId) -> Option<String> {
+        None
     }
 }
 impl From<Reliability> for tangled::Reliability {

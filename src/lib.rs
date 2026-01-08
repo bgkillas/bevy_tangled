@@ -103,13 +103,18 @@ pub enum ClientTypeRef<'a> {
     #[cfg(feature = "tangled")]
     Ip(&'a IpClient),
     #[cfg(not(any(feature = "steam", feature = "tangled")))]
-    None(&'a u8),
+    None(&'a ()),
 }
 #[cfg_attr(feature = "bevy", derive(Resource))]
 pub struct Client {
     client: ClientType,
     #[cfg(feature = "steam")]
     app_id: u32,
+}
+pub enum ClientMode {
+    None,
+    Steam,
+    Ip,
 }
 impl Default for Client {
     fn default() -> Self {
@@ -223,6 +228,15 @@ impl ClientTrait for Client {
     fn is_connected(&self) -> bool {
         self.client.is_connected()
     }
+    fn mode(&self) -> ClientMode {
+        self.client.mode()
+    }
+    fn get_name(&self) -> Option<String> {
+        self.client.get_name()
+    }
+    fn get_name_of(&self, id: PeerId) -> Option<String> {
+        self.client.get_name_of(id)
+    }
 }
 impl ClientTrait for ClientType {
     fn send<T: Encode>(
@@ -324,6 +338,33 @@ impl ClientTrait for ClientType {
             Self::Steam(client) => client.is_connected(),
             #[cfg(feature = "tangled")]
             Self::Ip(client) => client.is_connected(),
+        }
+    }
+    fn mode(&self) -> ClientMode {
+        match &self {
+            Self::None => ClientMode::None,
+            #[cfg(feature = "steam")]
+            Self::Steam(_) => ClientMode::Steam,
+            #[cfg(feature = "tangled")]
+            Self::Ip(_) => ClientMode::Ip,
+        }
+    }
+    fn get_name(&self) -> Option<String> {
+        match &self {
+            Self::None => None,
+            #[cfg(feature = "steam")]
+            Self::Steam(client) => client.get_name(),
+            #[cfg(feature = "tangled")]
+            Self::Ip(_) => None,
+        }
+    }
+    fn get_name_of(&self, id: PeerId) -> Option<String> {
+        match &self {
+            Self::None => None,
+            #[cfg(feature = "steam")]
+            Self::Steam(client) => client.get_name_of(id),
+            #[cfg(feature = "tangled")]
+            Self::Ip(_) => None,
         }
     }
 }
@@ -438,6 +479,36 @@ impl ClientTrait for ClientTypeRef<'_> {
             Self::Ip(client) => client.is_connected(),
         }
     }
+    fn mode(&self) -> ClientMode {
+        match &self {
+            #[cfg(not(any(feature = "steam", feature = "tangled")))]
+            Self::None(_) => ClientMode::None,
+            #[cfg(feature = "steam")]
+            Self::Steam(_) => ClientMode::Steam,
+            #[cfg(feature = "tangled")]
+            Self::Ip(_) => ClientMode::Ip,
+        }
+    }
+    fn get_name(&self) -> Option<String> {
+        match &self {
+            #[cfg(not(any(feature = "steam", feature = "tangled")))]
+            Self::None(_) => None,
+            #[cfg(feature = "steam")]
+            Self::Steam(client) => client.get_name(),
+            #[cfg(feature = "tangled")]
+            Self::Ip(_) => None,
+        }
+    }
+    fn get_name_of(&self, id: PeerId) -> Option<String> {
+        match &self {
+            #[cfg(not(any(feature = "steam", feature = "tangled")))]
+            Self::None(_) => None,
+            #[cfg(feature = "steam")]
+            Self::Steam(client) => client.get_name_of(id),
+            #[cfg(feature = "tangled")]
+            Self::Ip(_) => None,
+        }
+    }
 }
 pub trait ClientTrait {
     fn send<T: Encode>(
@@ -461,6 +532,9 @@ pub trait ClientTrait {
     fn is_host(&self) -> bool;
     fn peer_len(&self) -> usize;
     fn is_connected(&self) -> bool;
+    fn mode(&self) -> ClientMode;
+    fn get_name(&self) -> Option<String>;
+    fn get_name_of(&self, id: PeerId) -> Option<String>;
 }
 #[derive(Debug)]
 pub enum NetError {
