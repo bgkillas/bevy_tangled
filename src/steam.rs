@@ -29,7 +29,7 @@ pub struct SteamClient {
     pub(crate) lobby_id: LobbyId,
     pub(crate) connections: HashMap<PeerId, Connection>,
     pub(crate) poll_group: NetPollGroup,
-    pub(crate) listen_socket: Option<Mutex<ListenSocket>>,
+    pub(crate) listen_socket: Option<ListenSocket>,
     pub(crate) peer_connected: ClientCallback,
     pub(crate) peer_disconnected: ClientCallback,
     pub(crate) buffer: Vec<NetworkingMessage>,
@@ -100,8 +100,7 @@ impl SteamClient {
         self.listen_socket = Some(
             self.steam_client
                 .networking_sockets()
-                .create_listen_socket_p2p(0, None)?
-                .into(),
+                .create_listen_socket_p2p(0, None)?,
         );
         let tx = self.tx.clone();
         self.steam_client
@@ -238,7 +237,6 @@ impl SteamClient {
                 _ => {}
             });
         if let Some(listen) = &self.listen_socket {
-            let listen = listen.lock().unwrap();
             while let Some(event) = listen.try_receive_event() {
                 match event {
                     ListenSocketEvent::Connecting(event) => {
@@ -477,7 +475,14 @@ impl Client {
         };
         client.lobby_list.lock().unwrap().clone()
     }
+    pub fn disconnect(&mut self, peer: PeerId) {
+        let ClientType::Steam(client) = &mut self.client else {
+            return;
+        };
+        client.connections.remove(&peer);
+    }
     pub fn ban(&mut self, peer: PeerId) {
+        self.disconnect(peer);
         let ClientType::Steam(client) = &mut self.client else {
             return;
         };
