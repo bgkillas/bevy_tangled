@@ -9,8 +9,8 @@ use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
 use steamworks::networking_sockets::{InvalidHandle, ListenSocket, NetConnection, NetPollGroup};
 use steamworks::networking_types::{
-    ListenSocketEvent, NetConnectionStatusChanged, NetworkingConnectionState, NetworkingIdentity,
-    NetworkingMessage, SendFlags,
+    ListenSocketEvent, NetConnectionEnd, NetConnectionStatusChanged, NetworkingConnectionState,
+    NetworkingIdentity, NetworkingMessage, SendFlags,
 };
 use steamworks::{
     CallbackResult, DistanceFilter, GameLobbyJoinRequested, LobbyId, LobbyType, SteamAPIInitError,
@@ -36,6 +36,7 @@ pub struct SteamClient {
     pub(crate) send_buffer: RefCell<Vec<(PeerId, Vec<u8>)>>,
     #[allow(clippy::type_complexity)]
     pub(crate) lobby_list: Arc<Mutex<Option<Result<Vec<LobbyId>, SteamError>>>>,
+    pub(crate) ban_list: Vec<PeerId>,
     rx: Arc<Mutex<Receiver<Result<LobbyId, SteamError>>>>,
     tx: Arc<Mutex<Sender<Result<LobbyId, SteamError>>>>,
 }
@@ -88,6 +89,7 @@ impl SteamClient {
             buffer: Vec::with_capacity(64),
             listen_socket: None,
             send_buffer: Vec::with_capacity(32).into(),
+            ban_list: Vec::with_capacity(32),
             rx: Arc::new(rx.into()),
             tx: Arc::new(tx.into()),
         })
@@ -242,7 +244,14 @@ impl SteamClient {
                     ListenSocketEvent::Connecting(event) => {
                         #[cfg(feature = "log")]
                         info!("connecting to someone");
-                        event.accept().unwrap();
+                        if self
+                            .ban_list
+                            .contains(&event.remote().steam_id().unwrap().into())
+                        {
+                            event.reject(NetConnectionEnd::Invalid, None);
+                        } else {
+                            event.accept()?;
+                        }
                     }
                     ListenSocketEvent::Connected(event) => {
                         let id = event.remote().steam_id().unwrap();
@@ -467,5 +476,17 @@ impl Client {
             return None;
         };
         client.lobby_list.lock().unwrap().clone()
+    }
+    pub fn ban(&mut self, peer: PeerId) {
+        let ClientType::Steam(client) = &mut self.client else {
+            return;
+        };
+        client.ban_list.push(peer)
+    }
+    pub fn unban(&mut self, peer: PeerId) {
+        let ClientType::Steam(client) = &mut self.client else {
+            return;
+        };
+        client.ban_list.retain(|p| *p != peer)
     }
 }
