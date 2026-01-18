@@ -1,6 +1,6 @@
 use crate::{
-    Client, ClientCallback, ClientMode, ClientTrait, ClientType, ClientTypeRef, Compression,
-    Message, NetError, PeerId, Reliability, pack, unpack,
+    Client, ClientCallback, ClientMode, ClientTrait, ClientTypeRef, Compression, Message, NetError,
+    PeerId, Reliability, pack, unpack,
 };
 use bitcode::{DecodeOwned, Encode};
 use std::net::{IpAddr, SocketAddr};
@@ -189,7 +189,7 @@ impl Client {
         peer_disconnected: ClientCallback,
     ) -> Result<(), TangledInitError> {
         let socket = SocketAddr::new("::".parse().unwrap(), DEFAULT_PORT);
-        self.client = ClientType::Ip(IpClient::host(socket, peer_connected, peer_disconnected)?);
+        self.ip_client = Some(IpClient::host(socket, peer_connected, peer_disconnected)?);
         Ok(())
     }
     pub fn join_ip(
@@ -199,7 +199,7 @@ impl Client {
         peer_disconnected: ClientCallback,
     ) -> Result<(), TangledInitError> {
         let socket = SocketAddr::new(addr, DEFAULT_PORT);
-        self.client = ClientType::Ip(IpClient::join(socket, peer_connected, peer_disconnected)?);
+        self.ip_client = Some(IpClient::join(socket, peer_connected, peer_disconnected)?);
         Ok(())
     }
     pub fn host_ip_runtime(
@@ -211,7 +211,7 @@ impl Client {
         let socket = SocketAddr::new("::".parse().unwrap(), DEFAULT_PORT);
         let client =
             runtime.block_on(async { IpClient::host(socket, peer_connected, peer_disconnected) });
-        self.client = ClientType::Ip(client?);
+        self.ip_client = Some(client?);
         Ok(())
     }
     pub fn join_ip_runtime(
@@ -224,7 +224,7 @@ impl Client {
         let socket = SocketAddr::new(addr, DEFAULT_PORT);
         let client =
             runtime.block_on(async { IpClient::join(socket, peer_connected, peer_disconnected) });
-        self.client = ClientType::Ip(client?);
+        self.ip_client = Some(client?);
         Ok(())
     }
 }

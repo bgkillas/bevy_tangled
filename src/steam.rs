@@ -1,6 +1,6 @@
 use crate::{
-    Client, ClientCallback, ClientMode, ClientTrait, ClientType, ClientTypeRef, Compression,
-    Message, NetError, NetworkingInfo, PeerId, Reliability, pack, unpack,
+    Client, ClientCallback, ClientMode, ClientTrait, ClientTypeRef, Compression, Message, NetError,
+    NetworkingInfo, PeerId, Reliability, pack, unpack,
 };
 use bitcode::{DecodeOwned, Encode};
 use std::cell::RefCell;
@@ -23,7 +23,7 @@ pub(crate) struct Connection {
     pub(crate) connected: bool,
 }
 pub struct SteamClient {
-    pub(crate) steam_client: steamworks::Client,
+    pub(crate) steamworks: steamworks::Client,
     pub(crate) my_id: PeerId,
     pub(crate) host_id: PeerId,
     pub(crate) lobby_id: LobbyId,
@@ -45,7 +45,7 @@ unsafe impl Sync for SteamClient {}
 impl SteamClient {
     pub fn info(&self) -> NetworkingInfo {
         let mut v = Vec::new();
-        let sockets = self.steam_client.networking_sockets();
+        let sockets = self.steamworks.networking_sockets();
         for (peer, con) in &self.connections {
             v.push((
                 *peer,
@@ -77,7 +77,7 @@ impl SteamClient {
         let my_id = steam_client.user().steam_id().into();
         let (tx, rx) = channel();
         Ok(Self {
-            steam_client,
+            steamworks: steam_client,
             my_id,
             host_id: PeerId(0),
             lobby_id: LobbyId::from_raw(0),
@@ -98,12 +98,12 @@ impl SteamClient {
         self.reset();
         self.host_id = self.my_id;
         self.listen_socket = Some(
-            self.steam_client
+            self.steamworks
                 .networking_sockets()
                 .create_listen_socket_p2p(0, None)?,
         );
         let tx = self.tx.clone();
-        self.steam_client
+        self.steamworks
             .matchmaking()
             .create_lobby(LobbyType::FriendsOnly, 250, move |s| {
                 let _ = tx.lock().unwrap().send(s);
@@ -113,7 +113,7 @@ impl SteamClient {
     pub(crate) fn join(&mut self, id: LobbyId) {
         self.reset();
         let tx = self.tx.clone();
-        self.steam_client.matchmaking().join_lobby(id, move |s| {
+        self.steamworks.matchmaking().join_lobby(id, move |s| {
             let _ = tx.lock().unwrap().send(s.map_err(|_| SteamError::Generic));
         })
     }
@@ -151,7 +151,7 @@ impl SteamClient {
     fn connect(&mut self, id: SteamId) {
         let peer_identity = NetworkingIdentity::new_steam_id(id);
         let connection = self
-            .steam_client
+            .steamworks
             .networking_sockets()
             .connect_p2p(peer_identity, 0, None)
             .unwrap();
@@ -172,7 +172,7 @@ impl SteamClient {
             let event = event?;
             self.lobby_id = event;
             if !self.is_host() {
-                let matchmaking = self.steam_client.matchmaking();
+                let matchmaking = self.steamworks.matchmaking();
                 let owner = matchmaking.lobby_owner(event);
                 self.host_id = owner.into();
                 for id in matchmaking.lobby_members(event) {
@@ -182,7 +182,7 @@ impl SteamClient {
                 }
             }
         }
-        self.steam_client
+        self.steamworks
             .clone()
             .process_callbacks(|callback| match callback {
                 CallbackResult::GameLobbyJoinRequested(GameLobbyJoinRequested {
@@ -349,10 +349,10 @@ impl ClientTrait for SteamClient {
         ClientMode::Steam
     }
     fn get_name(&self) -> Option<String> {
-        Some(self.steam_client.friends().name())
+        Some(self.steamworks.friends().name())
     }
     fn get_name_of(&self, id: PeerId) -> Option<String> {
-        Some(self.steam_client.friends().get_friend(id.into()).name())
+        Some(self.steamworks.friends().get_friend(id.into()).name())
     }
 }
 impl From<Reliability> for SendFlags {
@@ -375,123 +375,72 @@ impl From<PeerId> for SteamId {
 }
 impl Client {
     pub fn host_steam(&mut self) -> Result<(), InvalidHandle> {
-        let ClientType::Steam(client) = &mut self.client else {
-            #[cfg(feature = "log")]
-            log!("steam not initialized, not hosting");
-            return Ok(());
-        };
-        client.host()
+        self.steam_client.host()
     }
     pub fn join_steam(&mut self, lobby: LobbyId) {
-        let ClientType::Steam(client) = &mut self.client else {
-            #[cfg(feature = "log")]
-            log!("steam not initialized, not joining");
-            return;
-        };
-        client.join(lobby);
+        self.steam_client.join(lobby);
     }
     pub fn flush(&self) {
-        if let ClientType::Steam(client) = &self.client {
-            client.connections.values().for_each(|c| {
-                if c.connected {
-                    c.net.flush_messages().unwrap();
-                }
-            })
-        }
+        self.steam_client.connections.values().for_each(|c| {
+            if c.connected {
+                c.net.flush_messages().unwrap();
+            }
+        })
     }
     pub fn set_rich_presence(&self, key: &str, value: Option<&str>) -> bool {
-        if let ClientType::Steam(client) = &self.client {
-            client.steam_client.friends().set_rich_presence(key, value)
-        } else {
-            true
-        }
+        self.steam_client
+            .steamworks
+            .friends()
+            .set_rich_presence(key, value)
     }
     pub fn clear_rich_presence(&self) {
-        if let ClientType::Steam(client) = &self.client {
-            client.steam_client.friends().clear_rich_presence()
-        }
-    }
-    pub fn init_steam(
-        &mut self,
-        peer_connected: ClientCallback,
-        peer_disconnected: ClientCallback,
-    ) -> Result<(), SteamAPIInitError> {
-        if !matches!(self.client, ClientType::Steam(_)) {
-            self.client = ClientType::Steam(Box::new(SteamClient::new(
-                self.app_id,
-                peer_connected,
-                peer_disconnected,
-            )?));
-        }
-        Ok(())
+        self.steam_client.steamworks.friends().clear_rich_presence()
     }
     pub fn get_lobby_my_data(&self, key: &str) -> Option<String> {
-        if let ClientType::Steam(client) = &self.client
-            && client.lobby_id.raw() != 0
-        {
-            self.get_lobby_data(client.lobby_id, key)
+        if self.steam_client.lobby_id.raw() != 0 {
+            self.get_lobby_data(self.steam_client.lobby_id, key)
         } else {
             None
         }
     }
     pub fn get_lobby_data(&self, id: LobbyId, key: &str) -> Option<String> {
-        if let ClientType::Steam(client) = &self.client {
-            client.steam_client.matchmaking().lobby_data(id, key)
-        } else {
-            None
-        }
+        self.steam_client
+            .steamworks
+            .matchmaking()
+            .lobby_data(id, key)
     }
     pub fn set_lobby_my_data(&self, key: &str, value: &str) {
-        if let ClientType::Steam(client) = &self.client
-            && client.lobby_id.raw() != 0
-        {
-            self.set_lobby_data(client.lobby_id, key, value);
+        if self.steam_client.lobby_id.raw() != 0 {
+            self.set_lobby_data(self.steam_client.lobby_id, key, value);
         }
     }
     pub fn set_lobby_data(&self, id: LobbyId, key: &str, value: &str) {
-        if let ClientType::Steam(client) = &self.client {
-            client
-                .steam_client
-                .matchmaking()
-                .set_lobby_data(id, key, value);
-        }
+        self.steam_client
+            .steamworks
+            .matchmaking()
+            .set_lobby_data(id, key, value);
     }
     pub fn update_lobby_list(&mut self) {
-        let ClientType::Steam(client) = &mut self.client else {
-            return;
-        };
-        client.lobby_list = Default::default();
-        let list = client.lobby_list.clone();
-        client
-            .steam_client
+        self.steam_client.lobby_list = Default::default();
+        let list = self.steam_client.lobby_list.clone();
+        self.steam_client
+            .steamworks
             .matchmaking()
             .request_lobby_list(move |data| {
                 *list.lock().unwrap() = Some(data);
             });
     }
     pub fn lobby_list(&self) -> Option<Result<Vec<LobbyId>, SteamError>> {
-        let ClientType::Steam(client) = &self.client else {
-            return None;
-        };
-        client.lobby_list.lock().unwrap().clone()
+        self.steam_client.lobby_list.lock().unwrap().clone()
     }
     pub fn disconnect(&mut self, peer: PeerId) {
-        let ClientType::Steam(client) = &mut self.client else {
-            return;
-        };
-        client.connections.remove(&peer);
+        self.steam_client.connections.remove(&peer);
     }
     pub fn ban(&mut self, peer: PeerId) {
         self.disconnect(peer);
-        let ClientType::Steam(client) = &mut self.client else {
-            return;
-        };
-        client.ban_list.push(peer)
+        self.steam_client.ban_list.push(peer)
     }
     pub fn unban(&mut self, peer: PeerId) {
-        let ClientType::Steam(client) = &mut self.client else {
-            return;
-        };
-        client.ban_list.retain(|p| *p != peer)
+        self.steam_client.ban_list.retain(|p| *p != peer)
     }
 }

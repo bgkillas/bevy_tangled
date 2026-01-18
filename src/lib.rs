@@ -7,8 +7,6 @@ use crate::ip::IpClient;
 #[cfg(feature = "steam")]
 use crate::steam::SteamClient;
 #[cfg(feature = "bevy")]
-use bevy_app::{App, Plugin};
-#[cfg(feature = "bevy")]
 use bevy_ecs::component::Component;
 #[cfg(feature = "bevy")]
 use bevy_ecs::resource::Resource;
@@ -90,13 +88,6 @@ pub(crate) fn unpack<T: DecodeOwned>(data: &[u8]) -> T {
     };
     decode(data).unwrap()
 }
-pub(crate) enum ClientType {
-    None,
-    #[cfg(feature = "steam")]
-    Steam(Box<SteamClient>),
-    #[cfg(feature = "tangled")]
-    Ip(IpClient),
-}
 pub enum ClientTypeRef<'a> {
     #[cfg(feature = "steam")]
     Steam(&'a SteamClient),
@@ -107,75 +98,73 @@ pub enum ClientTypeRef<'a> {
 }
 #[cfg_attr(feature = "bevy", derive(Resource))]
 pub struct Client {
-    client: ClientType,
     #[cfg(feature = "steam")]
-    app_id: u32,
+    steam_client: SteamClient,
+    #[cfg(feature = "tangled")]
+    ip_client: Option<IpClient>,
 }
 pub enum ClientMode {
-    None,
     Steam,
     Ip,
-}
-impl Default for Client {
-    fn default() -> Self {
-        Self {
-            #[cfg(feature = "steam")]
-            app_id: 480,
-            client: ClientType::None,
-        }
-    }
+    None,
 }
 impl Client {
-    pub fn new(#[cfg(feature = "steam")] app_id: u32) -> Self {
-        Self {
+    pub fn new(
+        #[cfg(feature = "steam")] app_id: u32,
+        #[cfg(feature = "steam")] peer_connected: ClientCallback,
+        #[cfg(feature = "steam")] peer_disconnected: ClientCallback,
+    ) -> Option<Self> {
+        Some(Self {
             #[cfg(feature = "steam")]
-            app_id,
-            ..Self::default()
-        }
+            steam_client: SteamClient::new(app_id, peer_connected, peer_disconnected).ok()?,
+            #[cfg(feature = "tangled")]
+            ip_client: None,
+        })
     }
     pub fn recv<T, F>(&mut self, f: F)
     where
         F: FnMut(ClientTypeRef, Message<T>),
         T: DecodeOwned,
     {
-        match &mut self.client {
-            ClientType::None => {}
-            #[cfg(feature = "steam")]
-            ClientType::Steam(client) => client.recv(f),
-            #[cfg(feature = "tangled")]
-            ClientType::Ip(client) => client.recv(f),
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &mut self.ip_client {
+            ip.recv(f);
+            return;
         }
+        #[cfg(feature = "steam")]
+        self.steam_client.recv(f)
     }
     pub fn recv_raw<F>(&mut self, f: F)
     where
         F: FnMut(ClientTypeRef, Message<&[u8]>),
     {
-        match &mut self.client {
-            ClientType::None => {}
-            #[cfg(feature = "steam")]
-            ClientType::Steam(client) => client.recv_raw(f),
-            #[cfg(feature = "tangled")]
-            ClientType::Ip(client) => client.recv_raw(f),
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &mut self.ip_client {
+            ip.recv_raw(f);
+            return;
         }
+        #[cfg(feature = "steam")]
+        self.steam_client.recv_raw(f)
     }
     #[allow(clippy::result_unit_err)]
     pub fn update(&mut self) -> UResult {
-        match &mut self.client {
-            ClientType::None => {}
-            #[cfg(feature = "steam")]
-            ClientType::Steam(client) => return client.update(),
-            #[cfg(feature = "tangled")]
-            ClientType::Ip(client) => client.update(),
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &mut self.ip_client {
+            ip.update();
+            return Ok(());
         }
+        #[cfg(feature = "steam")]
+        self.steam_client.update()?;
         Ok(())
     }
-    pub fn info(&self) -> Option<NetworkingInfo> {
-        match &self.client {
-            ClientType::None => None,
-            #[cfg(feature = "steam")]
-            ClientType::Steam(client) => Some(client.info()),
-            #[cfg(feature = "tangled")]
-            ClientType::Ip(_) => None,
+    pub fn info(&self) -> NetworkingInfo {
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.info()
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            NetworkingInfo()
         }
     }
 }
@@ -192,7 +181,18 @@ impl ClientTrait for Client {
         reliability: Reliability,
         compression: Compression,
     ) -> Result<(), NetError> {
-        self.client.send(dest, data, reliability, compression)
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.send(dest, data, reliability, compression);
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.send(dest, data, reliability, compression)
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            Ok(())
+        }
     }
     fn broadcast<T: Encode>(
         &self,
@@ -200,7 +200,18 @@ impl ClientTrait for Client {
         reliability: Reliability,
         compression: Compression,
     ) -> Result<(), NetError> {
-        self.client.broadcast(data, reliability, compression)
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.broadcast(data, reliability, compression);
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.broadcast(data, reliability, compression)
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            Ok(())
+        }
     }
     fn send_raw(
         &self,
@@ -208,163 +219,143 @@ impl ClientTrait for Client {
         data: &[u8],
         reliability: Reliability,
     ) -> Result<(), NetError> {
-        self.client.send_raw(dest, data, reliability)
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.send_raw(dest, data, reliability);
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.send_raw(dest, data, reliability)
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            Ok(())
+        }
     }
     fn broadcast_raw(&self, data: &[u8], reliability: Reliability) -> Result<(), NetError> {
-        self.client.broadcast_raw(data, reliability)
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.broadcast_raw(data, reliability);
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.broadcast_raw(data, reliability)
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            Ok(())
+        }
     }
     fn my_id(&self) -> PeerId {
-        self.client.my_id()
-    }
-    fn host_id(&self) -> PeerId {
-        self.client.host_id()
-    }
-    fn is_host(&self) -> bool {
-        self.client.is_host()
-    }
-    fn peer_len(&self) -> usize {
-        self.client.peer_len()
-    }
-    fn is_connected(&self) -> bool {
-        self.client.is_connected()
-    }
-    fn mode(&self) -> ClientMode {
-        self.client.mode()
-    }
-    fn get_name(&self) -> Option<String> {
-        self.client.get_name()
-    }
-    fn get_name_of(&self, id: PeerId) -> Option<String> {
-        self.client.get_name_of(id)
-    }
-}
-impl ClientTrait for ClientType {
-    fn send<T: Encode>(
-        &self,
-        dest: PeerId,
-        data: &T,
-        reliability: Reliability,
-        compression: Compression,
-    ) -> Result<(), NetError> {
-        match &self {
-            Self::None => {}
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.send(dest, data, reliability, compression)?,
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.send(dest, data, reliability, compression)?,
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.my_id();
         }
-        Ok(())
-    }
-    fn broadcast<T: Encode>(
-        &self,
-        data: &T,
-        reliability: Reliability,
-        compression: Compression,
-    ) -> Result<(), NetError> {
-        match &self {
-            Self::None => {}
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.broadcast(data, reliability, compression)?,
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.broadcast(data, reliability, compression)?,
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.my_id()
         }
-        Ok(())
-    }
-    fn send_raw(
-        &self,
-        dest: PeerId,
-        data: &[u8],
-        reliability: Reliability,
-    ) -> Result<(), NetError> {
-        match &self {
-            Self::None => {}
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.send_raw(dest, data, reliability)?,
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.send_raw(dest, data, reliability)?,
-        }
-        Ok(())
-    }
-    fn broadcast_raw(&self, data: &[u8], reliability: Reliability) -> Result<(), NetError> {
-        match &self {
-            Self::None => {}
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.broadcast_raw(data, reliability)?,
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.broadcast_raw(data, reliability)?,
-        }
-        Ok(())
-    }
-    fn my_id(&self) -> PeerId {
-        match &self {
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.my_id,
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.my_id(),
-            Self::None => PeerId(0),
+        #[cfg(not(feature = "steam"))]
+        {
+            PeerId(0)
         }
     }
     fn host_id(&self) -> PeerId {
-        match &self {
-            Self::None => PeerId(0),
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.host_id(),
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.host_id(),
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.host_id();
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.host_id()
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            PeerId(0)
         }
     }
     fn is_host(&self) -> bool {
-        match &self {
-            Self::None => true,
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.is_host(),
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.is_host(),
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.is_host();
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.is_host()
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            false
         }
     }
     fn peer_len(&self) -> usize {
-        match &self {
-            Self::None => 0,
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.peer_len(),
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.peer_len(),
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.peer_len();
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.peer_len()
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            0
         }
     }
     fn is_connected(&self) -> bool {
-        match &self {
-            Self::None => false,
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.is_connected(),
-            #[cfg(feature = "tangled")]
-            Self::Ip(client) => client.is_connected(),
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.is_connected();
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.is_connected()
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            false
         }
     }
     fn mode(&self) -> ClientMode {
-        match &self {
-            Self::None => ClientMode::None,
-            #[cfg(feature = "steam")]
-            Self::Steam(_) => ClientMode::Steam,
-            #[cfg(feature = "tangled")]
-            Self::Ip(_) => ClientMode::Ip,
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.mode();
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.mode()
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            ClientMode::None
         }
     }
     fn get_name(&self) -> Option<String> {
-        match &self {
-            Self::None => None,
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.get_name(),
-            #[cfg(feature = "tangled")]
-            Self::Ip(_) => None,
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.get_name();
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.get_name()
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            None
         }
     }
     fn get_name_of(&self, id: PeerId) -> Option<String> {
-        match &self {
-            Self::None => None,
-            #[cfg(feature = "steam")]
-            Self::Steam(client) => client.get_name_of(id),
-            #[cfg(feature = "tangled")]
-            Self::Ip(_) => None,
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.get_name_of(id);
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.get_name_of(id)
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            None
         }
     }
 }
@@ -562,30 +553,24 @@ impl From<SteamError> for NetError {
 }
 impl Error for NetError {}
 #[cfg(feature = "bevy")]
-impl Plugin for Client {
-    fn build(&self, app: &mut App) {
-        app.insert_resource(Self {
-            #[cfg(feature = "steam")]
-            app_id: self.app_id,
-            client: ClientType::None,
-        });
+pub fn update(mut client: bevy_ecs::system::ResMut<Client>) {
+    if let Err(_s) = client.update() {
+        #[cfg(feature = "log")]
+        warn!("{_s}")
     }
 }
-#[cfg(feature = "bevy")]
-pub fn update(mut client: bevy_ecs::system::ResMut<Client>) {
-    let _ = client.update();
-}
+#[cfg(not(feature = "steam"))]
 #[cfg(feature = "tangled")]
 #[cfg(test)]
 #[tokio::test]
 async fn test_ip() {
-    let mut host = Client::new(0);
+    let mut host = Client::new().unwrap();
     host.host_ip(None, None).unwrap();
-    let mut peer1 = Client::new(0);
+    let mut peer1 = Client::new().unwrap();
     peer1
         .join_ip("127.0.0.1".parse().unwrap(), None, None)
         .unwrap();
-    let mut peer2 = Client::new(0);
+    let mut peer2 = Client::new().unwrap();
     peer2
         .join_ip("127.0.0.1".parse().unwrap(), None, None)
         .unwrap();
