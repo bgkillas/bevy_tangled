@@ -10,6 +10,7 @@ use crate::steam::SteamClient;
 use bevy_ecs::component::Component;
 #[cfg(feature = "bevy")]
 use bevy_ecs::resource::Resource;
+pub use bitcode;
 use bitcode::{Decode, Encode};
 use bitcode::{DecodeOwned, decode, encode};
 #[cfg(feature = "compress")]
