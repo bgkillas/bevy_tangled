@@ -122,7 +122,10 @@ impl SteamClient {
         F: FnMut(ClientTypeRef, Message<T>),
         T: DecodeOwned,
     {
-        self.poll_group.receive_messages_to_buffer(&mut self.buffer);
+        let cap = self.buffer.capacity();
+        self.poll_group
+            .receive_messages_into(&mut self.buffer, cap)
+            .unwrap();
         while !self.buffer.is_empty() {
             for m in &self.buffer {
                 let src = m.identity_peer().steam_id().unwrap().into();
@@ -130,14 +133,19 @@ impl SteamClient {
                 f(ClientTypeRef::Steam(self), Message { src, data })
             }
             self.buffer.clear();
-            self.poll_group.receive_messages_to_buffer(&mut self.buffer);
+            self.poll_group
+                .receive_messages_into(&mut self.buffer, cap)
+                .unwrap();
         }
     }
     pub(crate) fn recv_raw<F>(&mut self, mut f: F)
     where
         F: FnMut(ClientTypeRef, Message<&[u8]>),
     {
-        self.poll_group.receive_messages_to_buffer(&mut self.buffer);
+        let cap = self.buffer.capacity();
+        self.poll_group
+            .receive_messages_into(&mut self.buffer, cap)
+            .unwrap();
         while !self.buffer.is_empty() {
             for m in &self.buffer {
                 let src = m.identity_peer().steam_id().unwrap().into();
@@ -145,7 +153,9 @@ impl SteamClient {
                 f(ClientTypeRef::Steam(self), Message { src, data })
             }
             self.buffer.clear();
-            self.poll_group.receive_messages_to_buffer(&mut self.buffer);
+            self.poll_group
+                .receive_messages_into(&mut self.buffer, cap)
+                .unwrap();
         }
     }
     fn connect(&mut self, id: SteamId) {
