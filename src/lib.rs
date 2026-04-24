@@ -10,8 +10,8 @@ use crate::steam::SteamClient;
 use bevy_ecs::component::Component;
 #[cfg(feature = "bevy")]
 use bevy_ecs::resource::Resource;
-pub use bitcode;
-pub use bitcode::{Decode, Encode};
+use bitcode;
+use bitcode::{Decode, Encode};
 use bitcode::{DecodeOwned, decode, encode};
 #[cfg(feature = "compress")]
 use lz4_flex::{compress_prepend_size, decompress_size_prepended};
