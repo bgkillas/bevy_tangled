@@ -11,7 +11,7 @@ use bevy_ecs::component::Component;
 #[cfg(feature = "bevy")]
 use bevy_ecs::resource::Resource;
 pub use bitcode;
-use bitcode::{Decode, Encode};
+pub use bitcode::{Decode, Encode};
 use bitcode::{DecodeOwned, decode, encode};
 #[cfg(feature = "compress")]
 use lz4_flex::{compress_prepend_size, decompress_size_prepended};
