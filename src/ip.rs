@@ -3,11 +3,10 @@ use crate::{
     PeerId, Reliability, pack, unpack,
 };
 use bitcode::{DecodeOwned, Encode};
-use std::net::{IpAddr, SocketAddr};
+use std::net::{IpAddr, Ipv6Addr, SocketAddr};
 use tangled::TangledInitError;
 use tangled::{NetworkEvent, Peer};
 use tokio::runtime::Runtime;
-pub const DEFAULT_PORT: u16 = 5143;
 pub struct IpClient {
     pub(crate) peer: Peer,
     pub(crate) peer_connected: ClientCallback,
@@ -188,30 +187,31 @@ impl From<PeerId> for tangled::PeerId {
 impl Client {
     pub fn host_ip(
         &mut self,
+        port: u16,
         peer_connected: ClientCallback,
         peer_disconnected: ClientCallback,
     ) -> Result<(), TangledInitError> {
-        let socket = SocketAddr::new("::".parse().unwrap(), DEFAULT_PORT);
+        let socket = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), port);
         self.ip_client = Some(IpClient::host(socket, peer_connected, peer_disconnected)?);
         Ok(())
     }
     pub fn join_ip(
         &mut self,
-        addr: IpAddr,
+        socket: SocketAddr,
         peer_connected: ClientCallback,
         peer_disconnected: ClientCallback,
     ) -> Result<(), TangledInitError> {
-        let socket = SocketAddr::new(addr, DEFAULT_PORT);
         self.ip_client = Some(IpClient::join(socket, peer_connected, peer_disconnected)?);
         Ok(())
     }
     pub fn host_ip_runtime(
         &mut self,
+        port: u16,
         peer_connected: ClientCallback,
         peer_disconnected: ClientCallback,
         runtime: &Runtime,
     ) -> Result<(), TangledInitError> {
-        let socket = SocketAddr::new("::".parse().unwrap(), DEFAULT_PORT);
+        let socket = SocketAddr::new(IpAddr::V6(Ipv6Addr::LOCALHOST), port);
         let client =
             runtime.block_on(async { IpClient::host(socket, peer_connected, peer_disconnected) });
         self.ip_client = Some(client?);
@@ -219,12 +219,11 @@ impl Client {
     }
     pub fn join_ip_runtime(
         &mut self,
-        addr: IpAddr,
+        socket: SocketAddr,
         peer_connected: ClientCallback,
         peer_disconnected: ClientCallback,
         runtime: &Runtime,
     ) -> Result<(), TangledInitError> {
-        let socket = SocketAddr::new(addr, DEFAULT_PORT);
         let client =
             runtime.block_on(async { IpClient::join(socket, peer_connected, peer_disconnected) });
         self.ip_client = Some(client?);
