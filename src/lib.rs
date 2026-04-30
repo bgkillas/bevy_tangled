@@ -288,6 +288,20 @@ impl ClientTrait for Client {
             false
         }
     }
+    fn is_client(&self) -> bool {
+        #[cfg(feature = "tangled")]
+        if let Some(ip) = &self.ip_client {
+            return ip.is_client();
+        }
+        #[cfg(feature = "steam")]
+        {
+            self.steam_client.is_client()
+        }
+        #[cfg(not(feature = "steam"))]
+        {
+            false
+        }
+    }
     fn peer_len(&self) -> usize {
         #[cfg(feature = "tangled")]
         if let Some(ip) = &self.ip_client {
@@ -443,11 +457,21 @@ impl ClientTrait for ClientTypeRef<'_> {
     fn is_host(&self) -> bool {
         match &self {
             #[cfg(not(any(feature = "steam", feature = "tangled")))]
-            Self::None(_) => true,
+            Self::None(_) => false,
             #[cfg(feature = "steam")]
             Self::Steam(client) => client.is_host(),
             #[cfg(feature = "tangled")]
             Self::Ip(client) => client.is_host(),
+        }
+    }
+    fn is_client(&self) -> bool {
+        match &self {
+            #[cfg(not(any(feature = "steam", feature = "tangled")))]
+            Self::None(_) => false,
+            #[cfg(feature = "steam")]
+            Self::Steam(client) => client.is_client(),
+            #[cfg(feature = "tangled")]
+            Self::Ip(client) => client.is_client(),
         }
     }
     fn peer_len(&self) -> usize {
@@ -521,6 +545,7 @@ pub trait ClientTrait {
     fn my_id(&self) -> PeerId;
     fn host_id(&self) -> PeerId;
     fn is_host(&self) -> bool;
+    fn is_client(&self) -> bool;
     fn peer_len(&self) -> usize;
     fn is_connected(&self) -> bool;
     fn mode(&self) -> ClientMode;

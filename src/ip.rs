@@ -146,13 +146,16 @@ impl ClientTrait for IpClient {
         PeerId(0)
     }
     fn is_host(&self) -> bool {
-        self.peer.my_id().unwrap() == tangled::PeerId(0)
+        self.peer.my_id().unwrap() == tangled::PeerId(0) && self.connected
     }
     fn peer_len(&self) -> usize {
         self.peer.iter_peer_ids().count()
     }
     fn is_connected(&self) -> bool {
         self.connected
+    }
+    fn is_client(&self) -> bool {
+        self.connected && !self.is_host()
     }
     fn mode(&self) -> ClientMode {
         ClientMode::Ip

@@ -343,17 +343,18 @@ impl ClientTrait for SteamClient {
         self.host_id
     }
     fn is_host(&self) -> bool {
-        self.listen_socket.is_some()
+        self.listen_socket.is_some() && self.lobby_id.raw() != 0
+    }
+    fn is_client(&self) -> bool {
+        self.connections
+            .get(&self.host_id)
+            .is_some_and(|a| a.connected)
     }
     fn peer_len(&self) -> usize {
         self.connections.len()
     }
     fn is_connected(&self) -> bool {
-        (self.is_host() && self.lobby_id.raw() != 0)
-            || self
-                .connections
-                .get(&self.host_id)
-                .is_some_and(|a| a.connected)
+        self.is_host() || self.is_client()
     }
     fn mode(&self) -> ClientMode {
         ClientMode::Steam
