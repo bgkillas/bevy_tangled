@@ -216,7 +216,7 @@ impl ClientTrait for Client {
     fn send_raw(
         &self,
         dest: PeerId,
-        data: &[u8],
+        data: Vec<u8>,
         reliability: Reliability,
     ) -> Result<(), NetError> {
         #[cfg(feature = "tangled")]
@@ -232,7 +232,7 @@ impl ClientTrait for Client {
             Ok(())
         }
     }
-    fn broadcast_raw(&self, data: &[u8], reliability: Reliability) -> Result<(), NetError> {
+    fn broadcast_raw(&self, data: Vec<u8>, reliability: Reliability) -> Result<(), NetError> {
         #[cfg(feature = "tangled")]
         if let Some(ip) = &self.ip_client {
             return ip.broadcast_raw(data, reliability);
@@ -410,7 +410,7 @@ impl ClientTrait for ClientTypeRef<'_> {
     fn send_raw(
         &self,
         dest: PeerId,
-        data: &[u8],
+        data: Vec<u8>,
         reliability: Reliability,
     ) -> Result<(), NetError> {
         match &self {
@@ -423,7 +423,7 @@ impl ClientTrait for ClientTypeRef<'_> {
         }
         Ok(())
     }
-    fn broadcast_raw(&self, data: &[u8], reliability: Reliability) -> Result<(), NetError> {
+    fn broadcast_raw(&self, data: Vec<u8>, reliability: Reliability) -> Result<(), NetError> {
         match &self {
             #[cfg(not(any(feature = "steam", feature = "tangled")))]
             Self::None(_) => {}
@@ -539,9 +539,13 @@ pub trait ClientTrait {
         reliability: Reliability,
         compression: Compression,
     ) -> Result<(), NetError>;
-    fn send_raw(&self, dest: PeerId, data: &[u8], reliability: Reliability)
-    -> Result<(), NetError>;
-    fn broadcast_raw(&self, data: &[u8], reliability: Reliability) -> Result<(), NetError>;
+    fn send_raw(
+        &self,
+        dest: PeerId,
+        data: Vec<u8>,
+        reliability: Reliability,
+    ) -> Result<(), NetError>;
+    fn broadcast_raw(&self, data: Vec<u8>, reliability: Reliability) -> Result<(), NetError>;
     fn my_id(&self) -> PeerId;
     fn host_id(&self) -> PeerId;
     fn is_host(&self) -> bool;

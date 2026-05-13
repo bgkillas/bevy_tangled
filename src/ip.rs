@@ -111,7 +111,7 @@ impl ClientTrait for IpClient {
         reliability: Reliability,
         compression: Compression,
     ) -> Result<(), NetError> {
-        self.send_raw(dest, &pack(data, compression), reliability)
+        self.send_raw(dest, pack(data, compression), reliability)
     }
     fn broadcast<T: Encode>(
         &self,
@@ -119,12 +119,12 @@ impl ClientTrait for IpClient {
         reliability: Reliability,
         compression: Compression,
     ) -> Result<(), NetError> {
-        self.broadcast_raw(&pack(data, compression), reliability)
+        self.broadcast_raw(pack(data, compression), reliability)
     }
     fn send_raw(
         &self,
         dest: PeerId,
-        data: &[u8],
+        data: Vec<u8>,
         reliability: Reliability,
     ) -> Result<(), NetError> {
         if self.connected {
@@ -132,7 +132,7 @@ impl ClientTrait for IpClient {
         }
         Ok(())
     }
-    fn broadcast_raw(&self, data: &[u8], reliability: Reliability) -> Result<(), NetError> {
+    fn broadcast_raw(&self, data: Vec<u8>, reliability: Reliability) -> Result<(), NetError> {
         if self.connected {
             self.peer.broadcast(data, reliability.into())?;
         }

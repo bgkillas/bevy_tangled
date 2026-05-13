@@ -3,7 +3,6 @@ use crate::{
     NetworkingInfo, PeerId, Reliability, pack, unpack,
 };
 use bitcode::{DecodeOwned, Encode};
-use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex};
@@ -33,7 +32,6 @@ pub struct SteamClient {
     pub(crate) peer_connected: ClientCallback,
     pub(crate) peer_disconnected: ClientCallback,
     pub(crate) buffer: Vec<NetworkingMessage>,
-    pub(crate) send_buffer: RefCell<Vec<(PeerId, Vec<u8>)>>,
     #[allow(clippy::type_complexity)]
     pub(crate) lobby_list: Arc<Mutex<Option<Result<Vec<LobbyId>, SteamError>>>>,
     pub(crate) ban_list: Vec<PeerId>,
@@ -88,7 +86,6 @@ impl SteamClient {
             lobby_list: Default::default(),
             buffer: Vec::with_capacity(64),
             listen_socket: None,
-            send_buffer: Vec::with_capacity(32).into(),
             ban_list: Vec::with_capacity(32),
             rx: Arc::new(rx.into()),
             tx: Arc::new(tx.into()),
@@ -218,14 +215,6 @@ impl SteamClient {
                                 c(ClientTypeRef::Steam(self), peer);
                                 self.peer_connected = Some(c);
                             }
-                            let mut buffer = self.send_buffer.borrow_mut();
-                            for data in buffer
-                                .iter()
-                                .filter_map(|(p, d)| if *p == peer { Some(d) } else { None })
-                            {
-                                self.send_raw(peer, data, Reliability::Reliable).unwrap();
-                            }
-                            buffer.retain(|(p, _)| *p != peer);
                         }
                     }
                     Ok(NetworkingConnectionState::ClosedByPeer) => {
@@ -301,7 +290,7 @@ impl ClientTrait for SteamClient {
         reliability: Reliability,
         compression: Compression,
     ) -> Result<(), NetError> {
-        self.send_raw(dest, &pack(data, compression), reliability)
+        self.send_raw(dest, pack(data, compression), reliability)
     }
     fn broadcast<T: Encode>(
         &self,
@@ -309,29 +298,25 @@ impl ClientTrait for SteamClient {
         reliability: Reliability,
         compression: Compression,
     ) -> Result<(), NetError> {
-        self.broadcast_raw(&pack(data, compression), reliability)
+        self.broadcast_raw(pack(data, compression), reliability)
     }
     fn send_raw(
         &self,
         dest: PeerId,
-        data: &[u8],
+        data: Vec<u8>,
         reliability: Reliability,
     ) -> Result<(), NetError> {
         if let Some(con) = self.connections.get(&dest)
             && con.connected
         {
-            con.net.send_message(data, reliability.into())?;
-        } else {
-            self.send_buffer.borrow_mut().push((dest, data.to_vec()))
+            con.net.send_message(&data, reliability.into())?;
         }
         Ok(())
     }
-    fn broadcast_raw(&self, data: &[u8], reliability: Reliability) -> Result<(), NetError> {
-        for (dest, con) in self.connections.iter() {
+    fn broadcast_raw(&self, data: Vec<u8>, reliability: Reliability) -> Result<(), NetError> {
+        for (_, con) in self.connections.iter() {
             if con.connected {
-                con.net.send_message(data, reliability.into())?;
-            } else {
-                self.send_buffer.borrow_mut().push((*dest, data.to_vec()))
+                con.net.send_message(&data, reliability.into())?;
             }
         }
         Ok(())
